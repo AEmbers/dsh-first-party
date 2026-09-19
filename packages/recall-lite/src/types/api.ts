@@ -1,0 +1,243 @@
+// /api/recall/* 端点请求/响应类型（事实来源：src/host/routes-core.js /
+// routes-manage.js 端点表 + src/host/errors.js 错误码；payloads.ts 复用结构）。
+// 仅类型导出。
+//
+// M4 后 ErrorCode 自 errors.ts 的 `(typeof ALL_CODES)[number]` 派生——M3 阶段
+// errors.js 尚未 as const，这里内联 18 个码值并回链注释。
+
+import type { FeedbackKind, LineageEntry } from './payloads.js'
+import type { ResolvedConfig } from './config.js'
+import type { ErrorCode } from '../host/errors.js'
+
+export type { ErrorCode }
+
+// 统一错误体（errBody 构造 + 各端点业务失败分支共用形状）
+export interface ErrBody {
+  ok: false
+  code: ErrorCode
+  message: string
+}
+
+// ---- init ----
+
+export interface InitArgs {
+  sessionId?: string
+}
+export interface InitNotice {
+  unsupported?: boolean
+  gitMissing?: boolean
+  homeFallback?: boolean
+}
+export interface InitResponse {
+  ok: boolean
+  root: string | null
+  notice: InitNotice | null
+  // 仅受支持平台且有 root 时下发（unsupported 分支缺省）；client 读侧可选
+  config?: { refillDraft: boolean; archiveOriginal: boolean }
+}
+
+// ---- snapshot-info ----
+
+export interface SnapshotInfoArgs {
+  sessionId?: string
+  messageId?: string
+}
+export interface SnapshotInfoResponse {
+  has: boolean
+  time: number | null
+  id: string
+  failed?: boolean
+  error?: string
+  kind?: FeedbackKind
+  skipped?: string[]
+}
+
+// ---- preview ----
+
+export interface PreviewArgs {
+  sessionId?: string
+  messageId?: string
+}
+export interface DiffChange {
+  kind: string
+  rel: string
+}
+export interface PreviewOk {
+  ok: true
+  changes: DiffChange[]
+  total: number
+  truncated: boolean
+  treeId: string | null
+  time: number | null
+  root: string | null
+  cutSeq: number | null
+}
+export type PreviewResponse = PreviewOk | ErrBody
+
+// ---- execute ----
+
+// 撤回范围：both = 文件与对话一并回退（现状默认）；session-only = 仅 fork 回退
+// 对话，工作区零改动。缺省/非法值一律按 both 处理——老 Client 不发、直调 API
+// 乱发都落回现状链路，Host/Client 同包发布也无需能力协商。
+export type RecallScope = 'both' | 'session-only'
+
+export interface ExecuteArgs {
+  sessionId?: string
+  messageId?: string
+  previewTreeId?: string
+  previewTotal?: number
+  scope?: RecallScope
+}
+export interface ExecuteOk {
+  ok: true
+  count: number
+  cutSeq: number | null
+  // fork 切点窗口内入队的排队消息 id：官方 fork 把「boundary 那条 turn/end
+  // 之后、下一个 turn/start 之前」的整段事件复制进子会话 seed，被撤回消息的
+  // inbox 入队记录正在其中——子会话重放后输入框上方会多出一条排队消息。
+  // 这些 id 即消息 id，也是官方 updateQueue 的寻址键；Client 在 fork 出的
+  // 子会话上按 id 直删（旧 Host 不下发 → 读侧可选）
+  staleQueueItemIds?: string[]
+}
+export type ExecuteResponse = ExecuteOk | ErrBody
+
+// ---- status ----
+
+export interface StatusArgs {
+  op?: 'clear'
+}
+export interface StatusErrorItem {
+  time: number
+  message: string
+  count: number
+  kind: FeedbackKind | null
+  hint: string | null
+}
+export interface StatusResponse {
+  ok: true
+  errors: StatusErrorItem[]
+  storeBase: string | null
+}
+
+// ---- lineage-record ----
+
+export interface LineageRecordArgs {
+  childId?: string
+  parentId?: string
+}
+export interface LineageRecordOk {
+  ok: true
+}
+export type LineageRecordResponse = LineageRecordOk | ErrBody
+
+// ---- exclude-get / exclude-set ----
+
+export interface ExcludeGetResponse {
+  ok: boolean
+  unsupported?: boolean
+  files?: Array<{ path: string; home: boolean; roots: string[]; content: string }>
+}
+export interface ExcludeSetArgs {
+  path?: string
+  content?: string
+}
+export interface ExcludeSetOk {
+  ok: true
+}
+export type ExcludeSetResponse = ExcludeSetOk | ErrBody | { ok: false; unsupported: true }
+
+// ---- config-get / config-set / config-reset ----
+
+export interface ConfigGetResponse {
+  ok: true
+  values: ResolvedConfig
+  overridden: Record<string, unknown>
+  envLocks: { gcSnaps: boolean; gcHours: boolean }
+  writable: boolean
+}
+export interface ConfigSetArgs {
+  patch?: Partial<ResolvedConfig>
+}
+export interface ConfigSetOk {
+  ok: true
+}
+export type ConfigSetResponse = ConfigSetOk | ErrBody
+export interface ConfigResetOk {
+  ok: true
+}
+export type ConfigResetResponse = ConfigResetOk | ErrBody
+
+// ---- manage ----
+
+export interface ManageListItem {
+  id: string
+  time: number
+  root: string | null
+  workspace: string | null
+  sessionId: string | null
+  sessionTitle: string | null
+  messageText?: string
+}
+
+export interface ManageArgs {
+  op?: string
+  sessionId?: string
+  limit?: number
+  sessionIds?: string[]
+  requests?: Array<{ sessionId?: string; messageId?: string }>
+  scope?: string
+  root?: string
+  messageId?: string
+}
+export interface ManageListOk {
+  ok: true
+  items: ManageListItem[]
+  total: number
+  stale?: boolean
+}
+export interface ManageTitlesOk {
+  ok: true
+  titles: Record<string, string | null>
+}
+export interface ManageMessagesOk {
+  ok: true
+  messageTexts: Record<string, string | null>
+}
+export interface ManageUsageOk {
+  ok: true
+  bytes: number
+  gitAvailable: boolean
+  homeStores: number
+  fallbackStores: number
+}
+export interface ManageDeleteOk {
+  ok: true
+  deleted?: number
+  stores?: number
+}
+// deleteAll 部分完成（有 store 失败）：deleted 随错误体一并回传
+export interface ManageDeleteAllPartial {
+  ok: false
+  code: ErrorCode
+  deleted: number
+  message: string
+}
+export interface ManageGcOk {
+  ok: true
+  gc: boolean
+}
+export interface ManageLineageOk {
+  ok: true
+  lineage: LineageEntry[]
+}
+export type ManageResponse =
+  | ManageListOk
+  | ManageTitlesOk
+  | ManageMessagesOk
+  | ManageUsageOk
+  | ManageDeleteOk
+  | ManageDeleteAllPartial
+  | ManageGcOk
+  | ManageLineageOk
+  | ErrBody
+  | { ok: false; unsupported: true }

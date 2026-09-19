@@ -1,0 +1,19 @@
+{
+  "name": "dsh-first-party",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "第一方 DSH 插件集合：用可控、可验证的自研实现替换高开销第三方 bundle。",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "license": "MIT"
+}

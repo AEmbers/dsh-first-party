@@ -1,0 +1,13 @@
+node_modules/
+*.log
+npm-debug.log*
+.DS_Store
+Thumbs.db
+
+# 影子快照仓库：绝不能被提交
+.dsh-recall-snapshots/
+dsh-recall-snapshots/
+
+# 构建中间物（lib/ 是分发产物，必须入库，不在此列）
+*.tsbuildinfo
+.cache/

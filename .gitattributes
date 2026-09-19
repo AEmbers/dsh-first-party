@@ -1,0 +1,9 @@
+# 统一行尾为 LF：仓库同时在 Windows 与 posix 上被 clone/构建，
+# 让 git 做自动 CRLF 转换会在每次提交产生整文件级的伪 diff。
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.ico binary
+*.woff binary
+*.woff2 binary

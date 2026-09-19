@@ -1,0 +1,31 @@
+# dsh-recall-lite bundle patch
+#
+# 持久插件挂载层（dsh.bundle.patch）：安装后由 DSH CLI 的 bundle 协调
+# 自动把本包加进 profile 的 dsh.profile.bundles，启动时合并这一个
+# insert 行——无需手动编辑任何 profile 文件。
+#
+# insert 的 id 刻意与上游 dsh-recall-plugin 保持一致（recall）：profile 里
+# 已存在的 `- id: recall` 覆盖行无需改写即可继续生效；同时也意味着两者
+# 不能同时安装——同一 id 只应有一行。
+#
+# 安装（本地目录）：
+#   dsh plugin --profile desktop add <本仓库路径>/packages/recall-lite
+- insert:
+    - id: recall
+      name: 'dsh-recall-lite'
+      # 默认值随层下发：用户在自己 profile 的 cordis.patch.yml 里按 id: recall
+      # 重述整行并改写这些键即可覆盖（patch 按行替换 config，不做深度合并）。
+      # 环境变量 DSH_RECALL_GC_SNAPS / DSH_RECALL_GC_HOURS 仍可强制覆盖前两项。
+      config:
+        gcSnaps: 50            # 每积累多少条快照触发一次 git gc
+        gcHours: 24            # 距上次 gc 超过多少小时触发（与条数先到先触发）
+        maxFileBytes: 104857600  # 超过该大小的文件不进快照、不被回退触碰
+        refillDraft: true      # 撤回后把被撤回的消息文本回填到输入框
+        # ---- 本 fork 新增：启动期预热策略 ----
+        # 'lazy'（默认）启动期一条 shell 都不起。工作区在「第一次要给它写
+        #              快照」「打开快照管理」「执行撤回」时才初始化。
+        # 'startup'   恢复上游行为（对每个历史 cwd 起一条 6 段链）。工作区
+        #              数量大时会显著拖慢启动，仅排障/对照实测时使用。
+        # 'off'       完全不预热，管理列表也不做索引自愈。
+        warmup: 'lazy'
+        # baseExcludes: ['.git', 'node_modules/', '.dsh-recall-snapshots/']  # 基础排除表（gitignore 语法）
